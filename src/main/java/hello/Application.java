@@ -18,6 +18,11 @@ public class Application {
     public String about() {
         return "Test About Hello World";
     }
+    
+    @RequestMapping("/help")
+    public String help() {
+        return "Help Hello World";
+    }
 
     public static void main(String[] args) {
         SpringApplication.run(Application.class, args);
