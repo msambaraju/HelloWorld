@@ -16,7 +16,7 @@ public class Application {
     
     @RequestMapping("/about")
     public String about() {
-        return "About Hello World";
+        return "Test About Hello World";
     }
 
     public static void main(String[] args) {
