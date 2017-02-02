@@ -21,7 +21,7 @@ public class Application {
     
     @RequestMapping("/help")
     public String help() {
-        return "Help";
+        return "Help Service";
     }
 
     public static void main(String[] args) {
