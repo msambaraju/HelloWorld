@@ -16,7 +16,7 @@ public class Application {
     
     @RequestMapping("/about")
     public String about() {
-        return "Test About Hello World";
+        return "Hello about service";
     }
     
     @RequestMapping("/help")
