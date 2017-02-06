@@ -30,8 +30,10 @@ dependencies {
     testCompile("org.springframework.boot:spring-boot-starter-test")
 }
 
+group = 'msorg'
+
 task buildDocker(type: Docker, dependsOn: build) {
-  push = false
+  push = true
   applicationName = jar.baseName
   dockerfile = file('docker/Dockerfile')
   doFirst {
