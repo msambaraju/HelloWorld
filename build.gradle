@@ -30,7 +30,7 @@ dependencies {
     testCompile("org.springframework.boot:spring-boot-starter-test")
 }
 
-group = 'msorg'
+group = 'ipponusa'
 
 task buildDocker(type: Docker, dependsOn: build) {
   push = true
