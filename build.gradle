@@ -1,17 +1,28 @@
+import de.gesellix.gradle.docker.tasks.*
+import static groovy.json.JsonOutput.prettyPrint
+import static groovy.json.JsonOutput.toJson
+
 buildscript {
     repositories {
         mavenCentral()
+        jcenter()
     }
     dependencies {
         classpath("org.springframework.boot:spring-boot-gradle-plugin:1.5.1.RELEASE")
-        classpath('se.transmode.gradle:gradle-docker:1.2')
+        classpath "de.gesellix:docker-client:2017-02-06T23-15-07"
     }
+}
+
+plugins {
+  id "de.gesellix.docker" version "2017-02-07T00-26-12"
 }
 
 apply plugin: 'java'
 apply plugin: 'eclipse'
 apply plugin: 'org.springframework.boot'
-apply plugin: 'docker'
+apply plugin: "de.gesellix.docker"
+
+//apply plugin: 'docker'
 
 jar {
     baseName = 'helloworld-docker'
@@ -30,16 +41,24 @@ dependencies {
     testCompile("org.springframework.boot:spring-boot-starter-test")
 }
 
-group = 'ipponusa'
+//group = 'ipponusa'
 
-task buildDocker(type: Docker, dependsOn: build) {
-  push = true
-  applicationName = jar.baseName
-  dockerfile = file('docker/Dockerfile')
+//docker {
+   // useApi true
+    //hostUrl 'http://54.210.169.16:2375/'
+//}
+
+ext {
+  remoteDockerHost = 'http://54.210.169.16:2375/'
+}
+
+task buildDocker(type: DockerBuildTask, dependsOn: build) {
+  imageName = jar.baseName
+  buildContextDirectory = file('docker')
   doFirst {
-	   copy {
+      copy {
 	     from jar
-	     into stageDir
+	     into buildContextDirectory
 	   }
-  	}
-  }
+  } 
+}
