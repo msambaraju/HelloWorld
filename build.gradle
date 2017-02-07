@@ -54,11 +54,12 @@ ext {
 
 task buildDocker(type: DockerBuildTask, dependsOn: build) {
   imageName = jar.baseName
-  buildContextDirectory = file('docker')
+  buildContextDirectory = file('./docker/')
+  println buildContextDirectory
   doFirst {
       copy {
 	     from jar
 	     into buildContextDirectory
 	   }
-  } 
+   } 
 }
