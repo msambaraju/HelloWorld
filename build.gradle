@@ -53,7 +53,7 @@ ext {
 }
 
 task buildDocker(type: DockerBuildTask, dependsOn: build) {
-  imageName = jar.baseName
+  imageName = "msorg/"+ jar.baseName
   buildContextDirectory = file('./docker/')
   println buildContextDirectory
   doFirst {
@@ -62,4 +62,16 @@ task buildDocker(type: DockerBuildTask, dependsOn: build) {
 	     into buildContextDirectory
 	   }
    } 
+}
+
+task pushImage(type: DockerPushTask) {
+  dependsOn buildDocker
+  repositoryName = "msorg/"+ jar.baseName
+  registry = "docker.io"
+}
+
+task pullImage(type: DockerPullTask) {
+  dependsOn pushImage
+  dockerHost = remoteDockerHost
+  imageName = "msorg/"+ jar.baseName
 }
