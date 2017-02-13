@@ -1,6 +1,6 @@
-//import de.gesellix.gradle.docker.tasks.*
 import static groovy.json.JsonOutput.prettyPrint
 import static groovy.json.JsonOutput.toJson
+import groovy.json.JsonSlurper
 import java.io.File
 
 buildscript {
@@ -10,22 +10,27 @@ buildscript {
     }
     dependencies {
         classpath("org.springframework.boot:spring-boot-gradle-plugin:1.5.1.RELEASE")
-        //classpath "de.gesellix:docker-client:2017-02-06T23-15-07"
         classpath "com.bmuschko:gradle-docker-plugin:3.0.5"
+        classpath "org.hidetake:gradle-ssh-plugin:2.8.0"
+        classpath "jp.classmethod.aws:gradle-aws-plugin:0.+"
     }
 }
 
-plugins {
-  //id "de.gesellix.docker" version "2017-02-07T00-26-12"
-}
 
 apply plugin: 'java'
 apply plugin: 'eclipse'
 apply plugin: 'org.springframework.boot'
-//apply plugin: "de.gesellix.docker"
 apply plugin: 'com.bmuschko.docker-remote-api'
+apply plugin: 'org.hidetake.ssh'
+apply plugin: "jp.classmethod.aws.s3"
 
-//apply plugin: 'docker'
+ext.systemProperties= System.properties
+
+aws {
+	profileName = "default"
+	region = "us-east-1"
+}
+
 
 jar {
     baseName = 'helloworld-docker'
@@ -44,53 +49,14 @@ dependencies {
     testCompile("org.springframework.boot:spring-boot-starter-test")
 }
 
-//group = 'ipponusa'
 
-//docker {
-   // useApi true
-    //hostUrl 'http://54.210.169.16:2375/'
-//}
-
-/*ext {
-  remoteDockerHost = "http://54.210.169.16:2375/"
-  registryHostname = "https://index.docker.io/v1/"
-  dockerCfgFilename = new File("~/.docker/config.json")
-}
-
-task buildDocker(type: DockerBuildTask, dependsOn: build) {
-  imageName = "msorg/"+ jar.baseName
-  buildContextDirectory = file('./docker/')
-  println buildContextDirectory
-  doFirst {
-      copy {
-	     from jar
-	     into buildContextDirectory
-	   }
-   } 
-}
-
-task pushImage(type: DockerPushTask) {
-  dependsOn buildDocker
-  repositoryName = "msorg/"+ jar.baseName
-  registry = "https://index.docker.io/v1"
-  authConfigPlain = getDockerClient().readAuthConfig(registryHostname, dockerCfgFilename)
-}
-
-task pullImage(type: DockerPullTask) {
-  dependsOn pushImage
-  dockerHost = remoteDockerHost
-  imageName = "msorg/"+ jar.baseName
-}
-*/
 
 import com.bmuschko.gradle.docker.tasks.image.Dockerfile
 import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
 import com.bmuschko.gradle.docker.tasks.image.DockerPushImage
+import com.bmuschko.gradle.docker.tasks.image.DockerPullImage
 
 docker {
-    //url = 'tcp://54.210.169.16:2375/'
-    //certPath = new File(System.properties['user.home'], '.boot2docker/certs/boot2docker-vm')
-
     registryCredentials {
         url = 'https://index.docker.io/v1'
         username = 'msambaraju'
@@ -108,8 +74,55 @@ task buildImage(type: DockerBuildImage) {
     dockerFile = new File('./docker/Dockerfile')
     inputDir = dockerFile.parentFile
     tag = "msorg/"+ jar.baseName
+    
+    doFirst {
+         copy {
+	     from jar
+	     into './docker/'
+	   }
+  	}
 }
 
 task pushImage(type: DockerPushImage) {
      imageName = "msorg/"+ jar.baseName
 }
+
+task pullImage(type: DockerPullImage) {
+    url = 'tcp://54.210.169.16:2375/'
+    repository = "msorg/"+ jar.baseName
+}
+
+def sshHost = '54.210.169.16'
+
+
+remotes {
+  jenkins {
+    host = sshHost
+    user = 'ec2-user'
+    password = 'ec2-user'
+    identity = file('/Users/malliksambaraju/AWS/MallikEC2Key.pem')
+  }
+}
+
+def stackName = 'TestStack'
+
+task createAWSStack(type:Exec) {
+ workingDir './template/'
+  //on linux
+  commandLine './cloudformation.sh', stackName
+  standardOutput = new ByteArrayOutputStream()
+	doLast {
+		ext.loginCommand = standardOutput.toString()
+		println loginCommand
+
+	}
+}
+
+/*import jp.classmethod.aws.gradle.cloudformation.AmazonCloudFormationWaitStackStatusTask
+import jp.classmethod.aws.gradle.cloudformation.AmazonCloudFormationPluginExtension
+
+task checkAWSStackStatus(type: AmazonCloudFormationWaitStackStatusTask) {
+   stackName = "mydockstack"
+} */
+
+

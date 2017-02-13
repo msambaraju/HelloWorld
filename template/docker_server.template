@@ -1,0 +1,133 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "Run an Ubuntu 14.04 LTS server with Docker.",
+
+  "Parameters": {
+    "InstanceType" : {
+      "Description" : "EC2 instance type",
+      "Type" : "String",
+      "Default" : "t1.micro",
+      "AllowedValues" : [ "t1.micro","m1.small","m1.medium","m1.large","m1.xlarge","m2.xlarge","m2.2xlarge","m2.4xlarge","m3.xlarge","m3.2xlarge","c1.medium","c1.xlarge","cc1.4xlarge","cc2.8xlarge","cg1.4xlarge", "m3.medium", "m3.large", "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge", "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge"],
+      "ConstraintDescription" : "must be a valid EC2 instance type"
+    },
+    "KeyName" : {
+      "Description" : "The EC2 Key Pair to allow SSH access to the instances",
+      "Type" : "String"
+    },
+    "EBSSize" : {
+      "Description" : "Size of EBS Drive (in Gigabytes)",
+      "Default" : "10",
+      "Type" : "Number",
+      "MinValue": "8"
+    }
+  },
+
+  "Mappings" : {
+    "AWSInstanceType2Arch" : {
+      "t1.micro"    : { "Arch" : "64" },
+      "m1.small"    : { "Arch" : "64" },
+      "m1.medium"   : { "Arch" : "64" },
+      "m1.large"    : { "Arch" : "64" },
+      "m1.xlarge"   : { "Arch" : "64" },
+      "m2.xlarge"   : { "Arch" : "64" },
+      "m2.2xlarge"  : { "Arch" : "64" },
+      "m2.4xlarge"  : { "Arch" : "64" },
+      "m3.medium"   : { "Arch" : "64" },
+      "m3.large"    : { "Arch" : "64" },
+      "m3.xlarge"   : { "Arch" : "64" },
+      "m3.2xlarge"  : { "Arch" : "64" },
+      "r3.large"    : { "Arch" : "64HVM" },
+      "r3.xlarge"   : { "Arch" : "64HVM" },
+      "r3.2xlarge"  : { "Arch" : "64HVM" },
+      "r3.4xlarge"  : { "Arch" : "64HVM" },
+      "r3.8xlarge"  : { "Arch" : "64HVM" },
+      "c3.large"    : { "Arch" : "64" },
+      "c3.xlarge"   : { "Arch" : "64" },
+      "c3.2xlarge"  : { "Arch" : "64" },
+      "c3.4xlarge"  : { "Arch" : "64" },
+      "c3.8xlarge"  : { "Arch" : "64" },
+      "c1.medium"   : { "Arch" : "64" },
+      "c1.xlarge"   : { "Arch" : "64" },
+      "cc1.4xlarge" : { "Arch" : "64HVM" },
+      "cc2.8xlarge" : { "Arch" : "64HVM" },
+      "cg1.4xlarge" : { "Arch" : "64HVM" }
+    },
+
+    "AWSRegionArch2AMI" : {
+      "us-east-1"      : { "64" : "ami-408c7f28", "64HVM" : "ami-588c7f30" },
+      "us-west-2"      : { "64" : "ami-f34032c3", "64HVM" : "ami-d34032e3" },
+      "us-west-1"      : { "64" : "ami-a26265e7", "64HVM" : "ami-5a61661f" },
+      "eu-west-1"      : { "64" : "ami-cb4986bc", "64HVM" : "ami-25488752" },
+      "ap-southeast-1" : { "64" : "ami-506d3102", "64HVM" : "ami-426d3110" },
+      "ap-southeast-2" : { "64" : "ami-7bb8dd41", "64HVM" : "ami-77b8dd4d" },
+      "ap-northeast-1" : { "64" : "ami-19dd9218", "64HVM" : "ami-d5dd92d4" },
+      "sa-east-1"      : { "64" : "ami-8f0aa692", "64HVM" : "ami-850aa698" }
+    }
+  },
+
+  "Resources" : {
+
+    "Server" : {
+      "Type" : "AWS::EC2::Instance",
+      "Properties" : {
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, 
+          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
+        "InstanceType" : { "Ref" : "InstanceType" },
+        "SecurityGroups" : [ { "Ref" : "ServerSecurityGroup" } ],
+        "KeyName" : { "Ref" : "KeyName" },
+        "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+          "#!/bin/sh\n",
+          "# Install Upgrades\n",
+          "apt-get update\n",
+          "apt-get -y upgrade\n",
+
+          "# Set up SSH throttling\n",
+          "iptables -A INPUT -p tcp --syn --dport 22 -m recent --name ssh --set\n",
+          "iptables -A INPUT -p tcp --syn --dport 22 -m recent --name ssh --rcheck --seconds 60 --hitcount 4 --rttl -j LOG --log-prefix \"SSH_brute_force \"\n",
+          "iptables -A INPUT -p tcp --syn --dport 22 -m recent --name ssh --rcheck --seconds 60 --hitcount 4 --rttl -j DROP\n",
+          "iptables-save > /etc/iptables.rules\n",
+          "echo '#!/bin/sh' > /etc/network/if-pre-up.d/iptablesload\n",
+          "echo 'iptables-restore < /etc/iptables.rules' >> /etc/network/if-pre-up.d/iptablesload\n",
+          "echo 'exit 0' >> /etc/network/if-pre-up.d/iptablesload\n",
+          "chmod a+x /etc/network/if-pre-up.d/iptablesload\n",
+
+          "# Install Docker\n",
+          "apt-get -y install docker.io\n",
+          "ln -sf /usr/bin/docker.io /usr/local/bin/docker\n",
+          "usermod -a -G docker ubuntu\n"
+          ]] }},
+        "BlockDeviceMappings" : [ {
+          "DeviceName" : "/dev/sda1",
+          "Ebs" : { "VolumeSize" : { "Ref" : "EBSSize" } }
+        } ]
+      }
+    },
+
+    "ServerSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Docker Server Security Group",
+        "SecurityGroupIngress" : [
+          { "IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0"}
+        ]
+      }
+    }
+  },
+
+  "Outputs" : {
+    "ServerAddress" : {
+      "Value" : { "Fn::GetAtt" : [ "Server", "PublicDnsName" ] },
+      "Description" : "Server Domain Name"
+    },
+     "ServerIP" : {
+      "Value" : { "Fn::GetAtt" : [ "Server", "PublicIp" ] },
+      "Description" : "Server Domain Name"
+    },
+    "SecurityGroup" : {
+      "Value" : { "Fn::GetAtt" : [ "ServerSecurityGroup", "GroupId" ] },
+      "Description" : "Server Security Group Id"
+    }
+  }
+}
+
+
