@@ -109,7 +109,8 @@ def stackName = 'TestStack'
 task createAWSStack(type:Exec) {
  workingDir './template/'
   //on linux
-  commandLine './cloudformation.sh', stackName
+  commandLine 'python', 'cloudformation.py','--accesskey=AKIAIGHMAUKGA3XEZ42Q', '--secret=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', '--keyname=MallikEC2Key',
+    '--stackname=TestStack', '--rollbacktimeout=10', '--waittime=120'
   standardOutput = new ByteArrayOutputStream()
 	doLast {
 		ext.loginCommand = standardOutput.toString()
