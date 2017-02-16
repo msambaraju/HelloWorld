@@ -59,9 +59,9 @@ import com.bmuschko.gradle.docker.tasks.image.DockerPullImage
 docker {
     registryCredentials {
         url = 'https://index.docker.io/v1'
-        username = 'msambaraju'
-        password = 'whatsup1'
-        email = 'msambaraju@gmail.com'
+        username = UID
+        password = PWD
+        email = EMAIL
     }
 }
 
@@ -92,7 +92,7 @@ task pullImage(type: DockerPullImage) {
     repository = "msorg/"+ jar.baseName
 }
 
-def sshHost = '54.210.169.16'
+def sshHost = HOST
 
 
 remotes {
@@ -109,7 +109,7 @@ def stackName = 'TestStack'
 task createAWSStack(type:Exec) {
  workingDir './template/'
   //on linux
-  commandLine 'python', 'cloudformation.py','--accesskey=AKIAIGHMAUKGA3XEZ42Q', '--secret=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', '--keyname=MallikEC2Key',
+  commandLine 'python', 'cloudformation.py','--accesskey=KEY', '--secret=SECRET', '--keyname=KEYPARAM',
     '--stackname=TestStack', '--rollbacktimeout=10', '--waittime=120'
   standardOutput = new ByteArrayOutputStream()
 	doLast {
