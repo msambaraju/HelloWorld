@@ -87,10 +87,6 @@ task pushImage(type: DockerPushImage) {
      imageName = "msorg/"+ jar.baseName
 }
 
-task pullImage(type: DockerPullImage) {
-    url = 'tcp://54.210.169.16:2375/'
-    repository = "msorg/"+ jar.baseName
-}
 
 def sshHost = HOST
 
@@ -98,9 +94,9 @@ def sshHost = HOST
 remotes {
   jenkins {
     host = sshHost
-    user = 'ec2-user'
-    password = 'ec2-user'
-    identity = file('/Users/malliksambaraju/AWS/MallikEC2Key.pem')
+    user = USER
+    password = USER
+    identity = file('SECURITY')
   }
 }
 
@@ -119,11 +115,5 @@ task createAWSStack(type:Exec) {
 	}
 }
 
-/*import jp.classmethod.aws.gradle.cloudformation.AmazonCloudFormationWaitStackStatusTask
-import jp.classmethod.aws.gradle.cloudformation.AmazonCloudFormationPluginExtension
-
-task checkAWSStackStatus(type: AmazonCloudFormationWaitStackStatusTask) {
-   stackName = "mydockstack"
-} */
 
 
