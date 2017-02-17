@@ -2,6 +2,10 @@ import static groovy.json.JsonOutput.prettyPrint
 import static groovy.json.JsonOutput.toJson
 import groovy.json.JsonSlurper
 import java.io.File
+import com.bmuschko.gradle.docker.tasks.image.Dockerfile
+import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
+import com.bmuschko.gradle.docker.tasks.image.DockerPushImage
+import com.bmuschko.gradle.docker.tasks.image.DockerPullImage
 
 buildscript {
     repositories {
@@ -12,7 +16,6 @@ buildscript {
         classpath("org.springframework.boot:spring-boot-gradle-plugin:1.5.1.RELEASE")
         classpath "com.bmuschko:gradle-docker-plugin:3.0.5"
         classpath "org.hidetake:gradle-ssh-plugin:2.8.0"
-        classpath "jp.classmethod.aws:gradle-aws-plugin:0.+"
     }
 }
 
@@ -22,15 +25,19 @@ apply plugin: 'eclipse'
 apply plugin: 'org.springframework.boot'
 apply plugin: 'com.bmuschko.docker-remote-api'
 apply plugin: 'org.hidetake.ssh'
-apply plugin: "jp.classmethod.aws.s3"
+
 
 ext.systemProperties= System.properties
 
-aws {
-	profileName = "default"
-	region = "us-east-1"
-}
-
+def stackName = 'TestStack'
+def org = 'msorg'
+def awsaccessKey = '--accesskey='+ awskey
+def secretKey = '--secret='+ awssecret
+def ec2Key = '--keyname='+ keyParam
+def stack = '--stackname=TestStack'
+def rbacktimeout = '--rollbacktimeout='+ rtimeout
+def waittime = '--waittime='+ looptime
+def jsonSlurper = new JsonSlurper()
 
 jar {
     baseName = 'helloworld-docker'
@@ -49,31 +56,19 @@ dependencies {
     testCompile("org.springframework.boot:spring-boot-starter-test")
 }
 
-
-
-import com.bmuschko.gradle.docker.tasks.image.Dockerfile
-import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
-import com.bmuschko.gradle.docker.tasks.image.DockerPushImage
-import com.bmuschko.gradle.docker.tasks.image.DockerPullImage
-
 docker {
     registryCredentials {
         url = 'https://index.docker.io/v1'
-        username = UID
-        password = PWD
-        email = EMAIL
+        username = dockerUser
+        password = dockerPassword
+        email = dockerEmail
     }
 }
 
-task createDockerfile(type: Dockerfile) {
-    destFile = project.file('./docker/Dockerfile')
-}
-
 task buildImage(type: DockerBuildImage) {
-    //dependsOn createDockerfile
     dockerFile = new File('./docker/Dockerfile')
     inputDir = dockerFile.parentFile
-    tag = "msorg/"+ jar.baseName
+    tag = org + "/" + jar.baseName
     
     doFirst {
          copy {
@@ -84,36 +79,54 @@ task buildImage(type: DockerBuildImage) {
 }
 
 task pushImage(type: DockerPushImage) {
-     imageName = "msorg/"+ jar.baseName
+     imageName = org + "/" + jar.baseName
 }
 
-
-def sshHost = HOST
-
-
 remotes {
-  jenkins {
-    host = sshHost
-    user = USER
-    password = USER
-    identity = file('SECURITY')
+  docker {
+    user = awsuser
+    identity = file(awspublickey)
   }
 }
 
-def stackName = 'TestStack'
-
 task createAWSStack(type:Exec) {
- workingDir './template/'
-  //on linux
-  commandLine 'python', 'cloudformation.py','--accesskey=KEY', '--secret=SECRET', '--keyname=KEYPARAM',
-    '--stackname=TestStack', '--rollbacktimeout=10', '--waittime=120'
+  workingDir './template/'
+  executable = "python"
+  args = ['cloudformation.py', awsaccessKey, secretKey, ec2Key, stack, rbacktimeout, waittime]
+    
   standardOutput = new ByteArrayOutputStream()
 	doLast {
-		ext.loginCommand = standardOutput.toString()
-		println loginCommand
-
+		ext.stackOutput = standardOutput.toString()
+		println "Populating vaules :" +stackOutput
+	    def object = jsonSlurper.parseText(stackOutput)
+	    ext.sshHost = object.ServerIp
+	    createAWSStack.ext.sshHost = object.ServerIP
+	    println "Service Ip is :" +createAWSStack.ext.sshHost
+	    sleep(600 * 1000)
 	}
 }
 
+def command = 'sudo docker run -d -p 80:8080 ' + org + "/" + jar.baseName
 
+ssh.settings {
+  knownHosts = allowAnyHosts
+}
+//dependsOn: createAWSStack
+task genericTask (dependsOn: createAWSStack) {
+   doFirst {
+      remotes.docker.host = createAWSStack.sshHost
+      //sleep(120 * 1000)
+   }
+   doLast {
+	   ssh.run {
+	     session(remotes.docker) {
+	      // Execute a command
+	      def result = execute command
+	      // Also Groovy methods or properties are available in a session closure
+	      println result
+	     }
+	  }
+  }
+}
 
+//genericTask.mustRunAfter createAWSStack
