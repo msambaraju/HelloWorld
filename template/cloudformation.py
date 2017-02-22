@@ -48,8 +48,6 @@ s3url = "https://s3.amazonaws.com/ipmstempbucket_0101/templatefile"
 
 from boto.cloudformation.connection import CloudFormationConnection
 cfConn = CloudFormationConnection(accessKey, secretKey)
-parameters = {}
-parameters["KeyName"] = keyPairName
 #stackName = "TestStack"
 disableRollback = False 
 

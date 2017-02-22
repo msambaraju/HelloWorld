@@ -19,7 +19,6 @@ buildscript {
     }
 }
 
-
 apply plugin: 'java'
 apply plugin: 'eclipse'
 apply plugin: 'org.springframework.boot'
@@ -30,22 +29,26 @@ apply plugin: 'org.hidetake.ssh'
 ext.systemProperties= System.properties
 
 def stackName = 'TestStack'
-def org = 'msorg'
+def org = dockerOrg
 def awsaccessKey = '--accesskey='+ awskey
 def secretKey = '--secret='+ awssecret
-def ec2Key = '--keyname='+ keyParam
-def stack = '--stackname=TestStack'
+def parameters = '--parameters='+ stackparams
+def stack = '--stackname='+stackName
 def rbacktimeout = '--rollbacktimeout='+ rtimeout
 def waittime = '--waittime='+ looptime
+def bucketname = '--bucketname='+s3bucketname
+def filename = '--filename=' +s3filename
+def fileloc = '--fileloc='+s3filelocation
+
 def jsonSlurper = new JsonSlurper()
 
 jar {
-    baseName = 'helloworld-docker'
-    version =  '0.1.0'
+    baseName = imageName
+    version =  imageVersion
 }
 
 repositories {
-    mavenCentral()
+   mavenCentral()
 }
 
 sourceCompatibility = 1.8
@@ -69,6 +72,7 @@ task buildImage(type: DockerBuildImage) {
     dockerFile = new File('./docker/Dockerfile')
     inputDir = dockerFile.parentFile
     tag = org + "/" + jar.baseName
+    buildArgs = ['appjar': jar.baseName+'-'+jar.version+'.jar']
     
     doFirst {
          copy {
@@ -82,6 +86,7 @@ task pushImage(type: DockerPushImage) {
      imageName = org + "/" + jar.baseName
 }
 
+
 remotes {
   docker {
     user = awsuser
@@ -89,21 +94,23 @@ remotes {
   }
 }
 
+def script =scriptloc+'cloudformation.py'
+
 task createAWSStack(type:Exec) {
-  workingDir './template/'
-  executable = "python"
-  args = ['cloudformation.py', awsaccessKey, secretKey, ec2Key, stack, rbacktimeout, waittime]
+   workingDir './template/'
+   executable = "python"
+   args = [script, awsaccessKey, secretKey, parameters, stack, rbacktimeout, waittime, bucketname,filename, fileloc]
     
-  standardOutput = new ByteArrayOutputStream()
-	doLast {
+   standardOutput = new ByteArrayOutputStream()
+	 doLast {
 		ext.stackOutput = standardOutput.toString()
-		println "Populating vaules :" +stackOutput
+		println "Populating values :" +stackOutput
 	    def object = jsonSlurper.parseText(stackOutput)
 	    ext.sshHost = object.ServerIp
 	    createAWSStack.ext.sshHost = object.ServerIP
 	    println "Service Ip is :" +createAWSStack.ext.sshHost
 	    sleep(600 * 1000)
-	}
+	 }
 }
 
 def command = 'sudo docker run -d -p 80:8080 ' + org + "/" + jar.baseName
@@ -111,8 +118,10 @@ def command = 'sudo docker run -d -p 80:8080 ' + org + "/" + jar.baseName
 ssh.settings {
   knownHosts = allowAnyHosts
 }
+
+
 //dependsOn: createAWSStack
-task genericTask (dependsOn: createAWSStack) {
+task runDockerImage (dependsOn: createAWSStack) {
    doFirst {
       remotes.docker.host = createAWSStack.sshHost
       //sleep(120 * 1000)
@@ -122,7 +131,6 @@ task genericTask (dependsOn: createAWSStack) {
 	     session(remotes.docker) {
 	      // Execute a command
 	      def result = execute command
-	      // Also Groovy methods or properties are available in a session closure
 	      println result
 	     }
 	  }

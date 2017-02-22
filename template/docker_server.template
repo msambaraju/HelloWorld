@@ -80,17 +80,6 @@
           "# Install Upgrades\n",
           "apt-get update\n",
           "apt-get -y upgrade\n",
-
-          "# Set up SSH throttling\n",
-          "iptables -A INPUT -p tcp --syn --dport 22 -m recent --name ssh --set\n",
-          "iptables -A INPUT -p tcp --syn --dport 22 -m recent --name ssh --rcheck --seconds 60 --hitcount 4 --rttl -j LOG --log-prefix \"SSH_brute_force \"\n",
-          "iptables -A INPUT -p tcp --syn --dport 22 -m recent --name ssh --rcheck --seconds 60 --hitcount 4 --rttl -j DROP\n",
-          "iptables-save > /etc/iptables.rules\n",
-          "echo '#!/bin/sh' > /etc/network/if-pre-up.d/iptablesload\n",
-          "echo 'iptables-restore < /etc/iptables.rules' >> /etc/network/if-pre-up.d/iptablesload\n",
-          "echo 'exit 0' >> /etc/network/if-pre-up.d/iptablesload\n",
-          "chmod a+x /etc/network/if-pre-up.d/iptablesload\n",
-
           "# Install Docker\n",
           "apt-get -y install docker.io\n",
           "ln -sf /usr/bin/docker.io /usr/local/bin/docker\n",
